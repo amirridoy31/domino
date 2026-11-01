@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Domino Score</title>
+<style>
+:root{
+  --bg:#f4f4f6;--card:#fff;--text:#1c1c1e;--muted:#6b6b70;--line:#e3e3e8;
+  --accent:#0a7d5a;--on-accent:#fff;--win:#d8f2e5;--field:#f0f0f3;--danger:#c0392b;
+  color-scheme:light dark;box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--bg:#0e0e10;--card:#1c1c1f;--text:#f2f2f4;--muted:#9a9aa2;--line:#2c2c31;--accent:#2fbf8f;--on-accent:#06251b;--win:#14382a;--field:#26262b;--danger:#ff7b6b}
+}
+:root[data-theme="dark"]{--bg:#0e0e10;--card:#1c1c1f;--text:#f2f2f4;--muted:#9a9aa2;--line:#2c2c31;--accent:#2fbf8f;--on-accent:#06251b;--win:#14382a;--field:#26262b;--danger:#ff7b6b}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+h1{font-size:24px;margin:0}
+.bar{display:flex;gap:8px}
+button{font:inherit;border:0;border-radius:10px;padding:10px 14px;background:var(--field);color:var(--text);cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--accent);color:var(--on-accent);font-weight:600;width:100%;padding:14px}
+#banner{display:none;background:var(--win);border-radius:14px;padding:14px;text-align:center;font-weight:700;font-size:20px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{background:var(--card);border-radius:14px;padding:12px;text-align:center;border:2px solid transparent}
+.card.win{background:var(--win);border-color:var(--accent)}
+.card.out{border-color:#e5372b}
+.card input{width:100%;text-align:center;font:inherit;font-weight:600;border:0;background:transparent;color:var(--text);padding:4px}
+.total{font-size:44px;font-weight:800;line-height:1.1}
+.track{height:8px;background:var(--field);border-radius:4px;overflow:hidden;margin:8px 0 4px}
+.fill{height:100%;width:0;background:var(--accent);transition:width .25s}
+.small{font-size:12px;color:var(--muted)}
+.total.zg{color:#1fa563}.total.zy{color:#d9a600}.total.zo{color:#f08a00}.total.zr{color:#e5372b}
+.fill.zg{background:#1fa563}.fill.zy{background:#d9a600}.fill.zo{background:#f08a00}.fill.zr{background:#e5372b}
+label.c{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:14px;margin-top:10px}
+label.c input{width:20px;height:20px}
+.hist2{display:flex;flex-direction:column;padding:8px 0;border-top:1px solid var(--line)}
+.panel{background:var(--card);border-radius:14px;padding:14px;margin-top:12px}
+.row4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0 12px}
+.row4 input{width:100%;text-align:center;font:inherit;font-size:18px;padding:12px 4px;border:0;border-radius:10px;background:var(--field);color:var(--text)}
+.hist{display:grid;grid-template-columns:36px repeat(4,1fr);gap:4px;padding:6px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums;text-align:center}
+.hist span:first-child{color:var(--muted);text-align:left}
+label.t{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:14px}
+label.t input{width:80px;font:inherit;padding:6px;border:0;border-radius:8px;background:var(--field);color:var(--text);text-align:center}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🎲 Domino Score</h1>
+    <div class="bar">
+      <button id="undo">Undo</button>
+      <button id="reset">New</button>
+    </div>
+  </header>
+
+  <div id="banner"></div>
+  <div class="grid" id="cards"></div>
+
+  <div class="panel">
+    <div class="small" id="roundLabel">Round 1</div>
+    <div class="row4" id="inputs"></div>
+    <button class="primary" id="add">Add round</button>
+  </div>
+
+  <div class="panel">
+    <label class="t">Game over when someone reaches <input id="target" type="number" inputmode="numeric" min="10" step="10"> points</label>
+    <label class="c"><input type="checkbox" id="sound"> Play a sound when the game ends</label>
+    
+  </div>
+
+  <div class="panel" id="histPanel" style="display:none">
+    <strong>History</strong>
+    <div id="hist"></div>
+  </div>
+<div class="panel" id="gamesPanel" style="display:none">
+    <strong>Past games</strong>
+    <div id="games"></div>
+    <button id="clearGames" style="margin-top:10px">Clear past games</button>
+  </div>
+</main>
+
+<script>
+(function(){
+  var KEY="dominoScoreV1";
+  var state={names:["Player 1","Player 2","Player 3","Player 4"],target:100,rounds:[]};
+  try{
+    var raw=localStorage.getItem(KEY);
+    if(raw){var s=JSON.parse(raw);if(s&&s.names&&s.rounds){state=s;}}
+  }catch(e){}
+  state.games=state.games||[];state.sound=state.sound!==false;state.recorded=!!state.recorded;
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+  function recordGame(){
+    var t=totals(),w=winner();
+    state.games.unshift({date:new Date().toLocaleDateString(),winner:"🏆 "+winners().map(nm).join(" & ")+" won",scores:state.names.map(function(n,i){return (n||"P"+(i+1))+" "+t[i];}).join(", ")});
+    state.games=state.games.slice(0,20);
+    state.recorded=true;
+  }
+  function fanfare(){
+    try{
+      var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+      var ctx=new AC();
+      var comp=ctx.createDynamicsCompressor();
+      comp.connect(ctx.destination);
+      var tone=function(type,f1,f2,start,dur,vol,vib){
+        var o=ctx.createOscillator(),g=ctx.createGain();
+        o.type=type;o.frequency.setValueAtTime(f1,start);
+        if(f2){o.frequency.exponentialRampToValueAtTime(f2,start+dur);}
+        g.gain.setValueAtTime(0.0001,start);
+        g.gain.exponentialRampToValueAtTime(vol,start+0.02);
+        g.gain.setValueAtTime(vol,start+dur-0.05);
+        g.gain.exponentialRampToValueAtTime(0.0001,start+dur);
+        o.connect(g);g.connect(comp);
+        if(vib){
+          var l=ctx.createOscillator(),lg=ctx.createGain();
+          l.frequency.value=7;lg.gain.value=vib;l.connect(lg);lg.connect(o.frequency);
+          l.start(start);l.stop(start+dur);
+        }
+        o.start(start);o.stop(start+dur);
+      };
+      var t=ctx.currentTime+0.05;
+      tone("sine",300,1800,t,0.7,0.95);
+      [523,659,784,1047,784,1047,1319,1047].forEach(function(f,i){
+        tone("square",f,0,t+0.8+i*0.18,0.16,0.6);
+      });
+      tone("sawtooth",392,355,t+2.4,0.3,0.7);
+      tone("sawtooth",370,335,t+2.7,0.3,0.7);
+      tone("sawtooth",349,315,t+3.0,0.3,0.7);
+      tone("sawtooth",330,0,t+3.3,1.0,0.8,14);
+    }catch(e){}
+  }
+
+  var $=function(id){return document.getElementById(id);};
+  var cards=[],fills=[],totalsEl=[],subs=[],ins=[];
+
+  for(var i=0;i<4;i++){(function(i){
+    var c=document.createElement("div");c.className="card";
+    var n=document.createElement("input");n.value=state.names[i];n.setAttribute("aria-label","Player "+(i+1)+" name");
+    n.addEventListener("input",function(){state.names[i]=n.value;save();render();});
+    var t=document.createElement("div");t.className="total";
+    var tr=document.createElement("div");tr.className="track";
+    var f=document.createElement("div");f.className="fill";tr.appendChild(f);
+    var sm=document.createElement("div");sm.className="small";
+    c.appendChild(n);c.appendChild(t);c.appendChild(tr);c.appendChild(sm);
+    $("cards").appendChild(c);
+    cards.push(c);fills.push(f);totalsEl.push(t);subs.push(sm);
+
+    var inp=document.createElement("input");inp.type="text";inp.inputMode="numeric";inp.placeholder="0";
+    inp.setAttribute("aria-label","Points for player "+(i+1));
+    $("inputs").appendChild(inp);ins.push(inp);
+  })(i);}
+
+  function totals(){
+    return [0,1,2,3].map(function(i){return state.rounds.reduce(function(a,r){return a+r[i];},0);});
+  }
+  function nm(i){return state.names[i]||"Player "+(i+1);}
+  function winners(){
+    var t=totals(),m=Math.max.apply(null,t);
+    if(m<state.target)return [];
+    var lo=Math.min.apply(null,t);
+    return [0,1,2,3].filter(function(i){return t[i]===lo;});
+  }
+  function winner(){
+    var t=totals(),m=Math.max.apply(null,t);
+    var ws=winners();return ws.length?ws[0]:-1;
+  }
+  function render(){
+    var t=totals(),w=winner();
+    for(var i=0;i<4;i++){
+      totalsEl[i].textContent=t[i];
+      var pct=t[i]/state.target*100;
+      fills[i].style.width=Math.min(100,Math.max(0,pct))+"%";
+      var z=t[i]>=100?"zr":t[i]>=75?"zo":t[i]>=50?"zy":t[i]>=1?"zg":"";
+      totalsEl[i].className="total "+z;
+      fills[i].className="fill "+z;
+      subs[i].textContent="of "+state.target;
+      cards[i].classList.toggle("win",w>=0&&winners().indexOf(i)>=0);
+      cards[i].classList.toggle("out",w>=0&&t[i]>=state.target);
+    }
+    var b=$("banner");
+    if(w>=0){var ws=winners();b.style.display="block";b.textContent="💥 "+nm(t.indexOf(Math.max.apply(null,t)))+" reached "+state.target+" and is loser👎 🏆 Winner: "+ws.map(nm).join(" & ");}
+    else{b.style.display="none";}
+    $("roundLabel").textContent="Round "+(state.rounds.length+1);
+    $("add").disabled=w>=0;
+    $("undo").disabled=state.rounds.length===0;
+    $("target").value=state.target;
+    $("sound").checked=state.sound;
+    var g=$("games");g.textContent="";
+    $("gamesPanel").style.display=state.games.length?"block":"none";
+    state.games.forEach(function(x){
+      var row=document.createElement("div");row.className="hist2";
+      var a=document.createElement("strong");a.textContent=x.winner;
+      var b=document.createElement("span");b.className="small";b.textContent=x.date+" · "+x.scores;
+      row.appendChild(a);row.appendChild(b);g.appendChild(row);
+    });
+    $("histPanel").style.display=state.rounds.length?"block":"none";
+    var h=$("hist");h.textContent="";
+    state.rounds.forEach(function(r,idx){
+      var row=document.createElement("div");row.className="hist";
+      var l=document.createElement("span");l.textContent="R"+(idx+1);row.appendChild(l);
+      r.forEach(function(v){var s=document.createElement("span");s.textContent=v;row.appendChild(s);});
+      h.appendChild(row);
+    });
+  }
+
+  $("add").addEventListener("click",function(){
+    var pts=ins.map(function(x){var v=parseInt(x.value,10);return isNaN(v)?0:v;});
+    state.rounds.push(pts);
+    if(winner()>=0&&!state.recorded){recordGame();if(state.sound)fanfare();}
+    ins.forEach(function(x){x.value="";});
+    save();render();
+    try{if(navigator.vibrate)navigator.vibrate(15);}catch(e){}
+  });
+  $("undo").addEventListener("click",function(){
+    if(state.recorded&&winner()>=0){state.games.shift();state.recorded=false;}
+    state.rounds.pop();save();render();
+  });
+  $("reset").addEventListener("click",function(){
+    state.rounds=[];state.recorded=false;ins.forEach(function(x){x.value="";});save();render();
+  });
+  $("sound").addEventListener("change",function(){state.sound=$("sound").checked;save();});
+  $("clearGames").addEventListener("click",function(){state.games=[];save();render();});
+  $("target").addEventListener("change",function(){
+    var v=parseInt($("target").value,10);
+    if(!isNaN(v)&&v>=10){state.target=v;save();}
+    render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>

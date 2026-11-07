@@ -43,6 +43,7 @@ label.c input{width:20px;height:20px}
 .hist2{display:flex;flex-direction:column;padding:8px 0;border-top:1px solid var(--line)}
 .panel{background:var(--card);border-radius:14px;padding:14px;margin-top:12px}
 .row4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0 12px}
+.row4 input::placeholder{font-size:12px}
 .row4 input{width:100%;text-align:center;font:inherit;font-size:18px;padding:12px 4px;border:0;border-radius:10px;background:var(--field);color:var(--text)}
 .hist{display:grid;grid-template-columns:36px repeat(4,1fr);gap:4px;padding:6px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums;text-align:center}
 .hist span:first-child{color:var(--muted);text-align:left}
@@ -190,7 +191,7 @@ label.t input{width:80px;font:inherit;padding:6px;border:0;border-radius:8px;bac
     $("add").disabled=w>=0;
     $("undo").disabled=state.rounds.length===0;
     $("target").value=state.target;
-    $("sound").checked=state.sound;
+    $("sound").checked=state.sound;ins.forEach(function(x,i){x.placeholder=nm(i);});
     var g=$("games");g.textContent="";
     $("gamesPanel").style.display=state.games.length?"block":"none";
     state.games.forEach(function(x){
@@ -201,6 +202,10 @@ label.t input{width:80px;font:inherit;padding:6px;border:0;border-radius:8px;bac
     });
     $("histPanel").style.display=state.rounds.length?"block":"none";
     var h=$("hist");h.textContent="";
+    var hd=document.createElement("div");hd.className="hist";hd.style.fontWeight="700";
+    hd.appendChild(document.createElement("span"));
+    [0,1,2,3].forEach(function(i){var s=document.createElement("span");s.textContent=nm(i);s.style.overflow="hidden";s.style.textOverflow="ellipsis";hd.appendChild(s);});
+    h.appendChild(hd);
     state.rounds.forEach(function(r,idx){
       var row=document.createElement("div");row.className="hist";
       var l=document.createElement("span");l.textContent="R"+(idx+1);row.appendChild(l);
